@@ -1,0 +1,93 @@
+apply plugin: 'maven-publish'
+
+def GROUP_ID = 'com.twiceyuan'
+def ARTIFACT_ID = 'mavensample'
+
+// 需要发布的 variant 定义
+def PUBLISH_VARIANT = ['fullRelease', 'domesticRelease']
+
+/**
+ * 发布配置参考：
+ * https://developer.android.com/studio/build/maven-publish-plugin
+ *
+ * 为每个 Variant 添加 JavaDoc 和 SourcesJar 参考自：
+ * https://github.com/bintray/gradle-bintray-plugin/issues/268
+ *
+ * 发布时有个小问题，如果使用 publishAllPublicationsToMavenRepository
+ * sourcesJar 里面不知道为什么只会有第二个 flavor 的类。
+ *
+ * 暂时可以单独执行每个要发布 variant 的 task 来避免这一问题，例如：
+ * publishDomesticReleasePublicationToMavenRepository
+ * publishFullReleasePublicationToMavenRepository
+ */
+afterEvaluate {
+
+    publishing {
+        publications {
+            android.libraryVariants.all { variant ->
+
+                // 过滤需要发布的 variant
+                if (!PUBLISH_VARIANT.contains(variant.name)) return
+
+                def flavored = !variant.flavorName.isEmpty()
+                def variantArtifactId = flavored ? variant.flavorName.replace('_', '-') : project.name
+                def javaDocDestDir = file("${buildDir}/docs/javadoc ${flavored ? variantArtifactId : ""}")
+                def sourceDirs = variant.sourceSets.collect {
+                    it.javaDirectories // Also includes kotlin sources if any.
+                }
+                def javadoc = task("${variant.name}Javadoc", type: Javadoc) {
+                    description "Generates Javadoc for ${variant.name}."
+                    source = variant.javaCompile.source // Yes, javaCompile is deprecated,
+                    // but I didn't find any working alternative. Please, tweet @Louis_CAD if you find one.
+                    destinationDir = javaDocDestDir
+                    classpath += files(android.getBootClasspath().join(File.pathSeparator))
+                    classpath += files(configurations.compile)
+                    options.links("http://docs.oracle.com/javase/7/docs/api/");
+                    options.links("http://d.android.com/reference/");
+                    exclude '**/BuildConfig.java'
+                    exclude '**/R.java'
+                    failOnError false
+                }
+
+                def javadocJar = task("javadocJar${variant.name.capitalize()}", type: Jar, dependsOn: javadoc) {
+                    description "Puts Javadoc for ${variant.name} in a jar."
+                    archiveClassifier.set('javadoc')
+                    from javadoc.destinationDir
+                }
+
+                def sourcesJar = task("sourcesJar${variant.name.capitalize()}", type: Jar) {
+                    description "Puts sources for ${variant.name} in a jar."
+                    from sourceDirs
+                    archiveClassifier.set('sources')
+                }
+
+                def flavorName = variant.flavorName
+                def publicationName = "${flavorName}Release"
+
+                "$publicationName"(MavenPublication) {
+                    from components[variant.name]
+
+                    groupId = GROUP_ID
+                    artifactId = ARTIFACT_ID
+                    artifact javadocJar
+                    artifact sourcesJar
+                    version = "${android.defaultConfig.versionName}-${flavorName}"
+
+                    // 打印出来 sourceDirs 是对的，但是发布时 domesticRelease 里的 source 文件是 full 的
+                    // class 文件却是对的。只能单独执行 variant 的 task 来上传
+                    // println "publicationName: $publicationName, sourceDirs: $sourceDirs"
+                }
+            }
+        }
+
+        repositories {
+            maven {
+                url properties.MAVEN_SERVER
+                credentials {
+                    username properties.MAVEN_USERNAME
+                    password properties.MAVEN_PASSWORD
+                }
+            }
+        }
+    }
+}
