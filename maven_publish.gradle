@@ -1,10 +1,16 @@
 apply plugin: 'maven-publish'
+apply plugin: 'kotlin-android'
 
-def GROUP_ID = 'com.twiceyuan'
-def ARTIFACT_ID = 'mavensample'
+def GROUP_ID = project.group
+def ARTIFACT_ID = project.properties.archivesBaseName
 
 // 需要发布的 variant 定义
 def PUBLISH_VARIANT = ['fullRelease', 'domesticRelease']
+
+// 在 local.properties 中配置需要的字段
+// MAVEN_SERVER, MAVEN_USERNAME, MAVEN_PASSWORD
+Properties localProps = new Properties()
+localProps.load(project.rootProject.file("local.properties").newDataInputStream())
 
 /**
  * 发布配置参考：
@@ -82,10 +88,10 @@ afterEvaluate {
 
         repositories {
             maven {
-                url properties.MAVEN_SERVER
+                url localProps.MAVEN_SERVER
                 credentials {
-                    username properties.MAVEN_USERNAME
-                    password properties.MAVEN_PASSWORD
+                    username localProps.MAVEN_USERNAME
+                    password localProps.MAVEN_PASSWORD
                 }
             }
         }
