@@ -41,6 +41,6 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.1.0'
     implementation 'androidx.core:core-ktx:1.2.0'
 
-    implementation 'com.twiceyuan:mavensample:1.0.24-domestic'
-//    implementation 'com.twiceyuan:mavensample:1.0.13-full'
+    customChannel1Implementation 'com.twiceyuan:mavensample:1.0.25-domestic'
+    customChannel2Implementation 'com.twiceyuan:mavensample:1.0.25-full'
 }
